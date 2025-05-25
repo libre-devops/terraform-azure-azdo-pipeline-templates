@@ -13,10 +13,6 @@ on:
         description: 'Terraform workspace'
         required: false
         default: 'dev'
-      terraform-init-extra-args-json:
-        description: 'Terraform init args'
-        required: false
-        default: '["-backend-config=subscription_id=${{ secrets.ARM_BACKEND_SUBSCRIPTION_ID }}", "-backend-config=resource_group_name=${{ secrets.ARM_BACKEND_STORAGE_RG_NAME }}", "-backend-config=storage_account_name=${{ secrets.ARM_BACKEND_STORAGE_ACCOUNT }}", "-backend-config=container_name=${{ secrets.ARM_BACKEND_CONTAINER_NAME }}"]'
       terraform-stack-to-run-json:
         description: 'Terraform stacks to run'
         required: false
@@ -25,6 +21,8 @@ on:
         description: 'Debug mode'
         required: false
         default: 'true'
+env:
+  terraform-init-extra-args-json: '["-backend-config=subscription_id=${{ secrets.ARM_BACKEND_SUBSCRIPTION_ID }}", "-backend-config=resource_group_name=${{ secrets.ARM_BACKEND_STORAGE_RG_NAME }}", "-backend-config=storage_account_name=${{ secrets.ARM_BACKEND_STORAGE_ACCOUNT }}", "-backend-config=container_name=${{ secrets.ARM_BACKEND_CONTAINER_NAME }}"]'
 
 
 permissions:
@@ -52,7 +50,7 @@ jobs:
           terraform-stack-to-run-json: ${{ inputs.terraform-stack-to-run }}
           terraform-workspace: ${{ inputs.terraform-workspace }}
           debug-mode: ${{ inputs.debug-mode }}
-          terraform-init-extra-args-json: ${{ inputs.terraform-init-extra-args-json }}
+          terraform-init-extra-args-json: ${{ vars.terraform-init-extra-args-json }}
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
