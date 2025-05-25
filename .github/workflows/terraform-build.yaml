@@ -12,7 +12,7 @@ on:
       terraform-stack-to-run-json:
         description: 'Terraform stacks to run'
         required: false
-        default: '["all"]'
+        default: '["rg"]'
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -36,8 +36,9 @@ jobs:
         uses: libre-devops/terraform-azure-docker-gh-action@v0.1
         with:
           terraform-code-location: 'terraform'
-          terraform-stack-to-run-json: '["rg"]'
-          terraform-workspace: 'dev'
+          terraform-stack-to-run-json: ${{ inputs.terraform-stack-to-run }}
+          terraform-workspace: ${{ inputs.terraform-workspace }}
+          debug-mode: true
           terraform-init-extra-args-json: '[
             "-backend-config=subscription_id=${{ secrets.ARM_BACKEND_SUBSCRIPTION_ID }}",
             "-backend-config=resource_group_name=${{ secrets.ARM_BACKEND_STORAGE_RG_NAME }}",
@@ -48,3 +49,4 @@ jobs:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TENV_AUTO_INSTALL: true
