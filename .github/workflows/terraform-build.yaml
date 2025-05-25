@@ -1,0 +1,30 @@
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Libre DevOps - Run Terraform for Azure
+        uses: libre-devops/terraform-azure-docker-gh-action@v0.1
+        with:
+          terraform-code-location: 'terraform'
+          terraform-stack-to-run-json: '["rg"]'
+          terraform-workspace: 'dev'
+          terraform-init-extra-args-json: '[
+            "-backend-config=subscription_id=${{ secrets.ARM_BACKEND_SUBSCRIPTION_ID }}",
+            "-backend-config=resource_group_name=${{ secrets.ARM_BACKEND_STORAGE_RG_NAME }}",
+            "-backend-config=storage_account_name=${{ secrets.ARM_BACKEND_STORAGE_ACCOUNT }}",
+            "-backend-config=container_name=${{ secrets.ARM_BACKEND_CONTAINER_NAME }}"
+          ]'
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
