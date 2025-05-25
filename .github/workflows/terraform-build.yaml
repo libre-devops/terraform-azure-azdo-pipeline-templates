@@ -1,3 +1,19 @@
+# .github/workflows/terraform-azure.yml
+
+name: Run Libre DevOps Terraform for Azure
+
+on:
+  workflow_dispatch:
+    inputs:
+      terraform-workspace:
+        description: 'Terraform workspace'
+        required: false
+        default: 'dev'
+      terraform-stack-to-run-json:
+        description: 'Terraform stacks to run'
+        required: false
+        default: '["all"]'
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
