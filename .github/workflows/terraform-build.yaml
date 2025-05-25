@@ -1,6 +1,6 @@
 # .github/workflows/terraform-azure.yml
 
-name: Run Libre DevOps Terraform for Azure
+name: Terraform Build
 
 on:
   workflow_dispatch:
@@ -14,6 +14,10 @@ on:
         required: false
         default: '["all"]'
 
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
@@ -24,9 +28,9 @@ jobs:
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
       - name: Libre DevOps - Run Terraform for Azure
         uses: libre-devops/terraform-azure-docker-gh-action@v0.1
