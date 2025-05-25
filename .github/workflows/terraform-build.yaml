@@ -5,6 +5,10 @@ name: Terraform Build
 on:
   workflow_dispatch:
     inputs:
+      terraform-code-location:
+        description: 'Terraform code location'
+        required: false
+        default: 'terraform'
       terraform-workspace:
         description: 'Terraform workspace'
         required: false
@@ -16,7 +20,7 @@ on:
       debug-mode:
         description: 'Debug mode'
         required: false
-        default: true
+        default: 'true'
 
 
 permissions:
@@ -40,10 +44,10 @@ jobs:
       - name: Libre DevOps - Run Terraform for Azure
         uses: libre-devops/terraform-azure-docker-gh-action@v0.1
         with:
-          terraform-code-location: 'terraform'
+          terraform-code-location: ${{ inputs.terraform-code-location }}
           terraform-stack-to-run-json: ${{ inputs.terraform-stack-to-run }}
           terraform-workspace: ${{ inputs.terraform-workspace }}
-          debug-mode: true
+          debug-mode: ${{ inputs.debug-mode }}
           terraform-init-extra-args-json: '[
             "-backend-config=subscription_id=${{ secrets.ARM_BACKEND_SUBSCRIPTION_ID }}",
             "-backend-config=resource_group_name=${{ secrets.ARM_BACKEND_STORAGE_RG_NAME }}",
