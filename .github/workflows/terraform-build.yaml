@@ -46,11 +46,11 @@ jobs:
       - name: Libre DevOps - Run Terraform for Azure
         uses: libre-devops/terraform-azure-docker-gh-action@v0.1
         with:
-          terraform-code-location: ${{ inputs.terraform-code-location }}
-          terraform-stack-to-run-json: ${{ inputs.terraform-stack-to-run }}
-          terraform-workspace: ${{ inputs.terraform-workspace }}
-          debug-mode: ${{ inputs.debug-mode }}
-          terraform-init-extra-args-json: ${{ vars.terraform-init-extra-args-json }}
+          terraform-code-location: ${{ github.event.inputs.terraform-code-location }}
+          terraform-stack-to-run-json: ${{ github.event.inputs.terraform-stack-to-run-json }}
+          terraform-workspace: ${{ github.event.inputs.terraform-workspace }}
+          debug-mode: ${{ github.event.inputs.debug-mode }}
+          terraform-init-extra-args-json: ${{ env.terraform-init-extra-args-json }}
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
