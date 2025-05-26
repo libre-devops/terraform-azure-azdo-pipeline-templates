@@ -1,5 +1,3 @@
-# .github/workflows/terraform-azure.yml
-
 name: Terraform Build
 
 on:
@@ -36,23 +34,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.ARM_CLIENT_ID }}
-          tenant-id: ${{ secrets.ARM_TENANT_ID }}
-          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-
-      - name: Get GitHub OIDC Token
-        id: get_oidc_token
-        run: |
-          OIDC_TOKEN=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-                "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" \
-                | jq -r '.value')
-              echo "OIDC_TOKEN=$OIDC_TOKEN" >> $GITHUB_ENV
-
       - name: Libre DevOps - Run Terraform for Azure
-        uses: libre-devops/terraform-azure-docker-gh-action@v0.1
+        uses: libre-devops/terraform-azure-composite-gh-action@v0.1
         with:
           terraform-code-location: ${{ github.event.inputs.terraform-code-location }}
           terraform-stack-to-run-json: ${{ github.event.inputs.terraform-stack-to-run-json }}
