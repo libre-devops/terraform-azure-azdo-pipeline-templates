@@ -1,11 +1,11 @@
 param (
     [string]$RunTerraformInit = "true",
     [string]$RunTerraformValidate = "true",
-    [string]$RunTerraformPlan = "true",
-    [string]$RunTerraformPlanDestroy = "false",
+    [string]$RunTerraformPlan = "false",
+    [string]$RunTerraformPlanDestroy = "true",
     [string]$RunTerraformApply = "false",
     [string]$RunTerraformDestroy = "false",
-    [string]$TerraformInitExtraArgsJson = '[]',
+    [string]$TerraformInitExtraArgsJson = '["-reconfigure", "-upgrade"]',
     [string]$TerraformInitCreateBackendStateFileName = "true",
     [string]$TerraformInitCreateBackendStateFilePrefix = "",
     [string]$TerraformInitCreateBackendStateFileSuffix = "",
@@ -18,19 +18,19 @@ param (
     [string]$DebugMode = "false",
     [string]$DeletePlanFiles = "true",
     [string]$InstallCheckov = "false",
-    [string]$RunCheckov = "true",
+    [string]$RunCheckov = "false",
     [string]$CheckovSkipCheck = "CKV2_AZURE_31",
     [string]$CheckovSoftfail = "true",
     [string]$CheckovExtraArgsJson = '[]',
     [string]$TerraformPlanFileName = "tfplan.plan",
     [string]$TerraformDestroyPlanFileName = "tfplan-destroy.plan",
-    [string]$TerraformCodeLocation = "terraform",
-    [string]$TerraformStackToRunJson = '["all"]', # JSON format Use 'all' to run 0_, 1_, etc and destroy in reverse order 1_, 0_ etc
+    [string]$TerraformCodeLocation = "examples",
+    [string]$TerraformStackToRunJson = '["module-development"]', # JSON format Use 'all' to run 0_, 1_, etc and destroy in reverse order 1_, 0_ etc
     [string]$CreateTerraformWorkspace = "true",
     [string]$TerraformWorkspace = "dev",
-    [string]$InstallAzureCli = "false",
-    [string]$UseAzureServiceConnection = "false",
-    [string]$AttemptAzureLogin = "true",
+    [string]$InstallAzureCli = "falFnse",
+    [string]$UseAzureServiceConnection = "true",
+    [string]$AttemptAzureLogin = "false",
     [string]$UseAzureClientSecretLogin = "false",
     [string]$UseAzureOidcLogin = "false",
     [string]$UseAzureUserLogin = "true",
@@ -250,26 +250,29 @@ try
                     -StacksToRun $TerraformStackToRun
 
         # ──────────────────── REVERSE execution order for destroys ────────────────
-        if ($convertedRunTerraformPlanDestroy -or $convertedRunTerraformDestroy)
-        {
+        if ($convertedRunTerraformPlanDestroy -or $convertedRunTerraformDestroy) {
+            _LogMessage -Level 'DEBUG' -Message "Begin reverse‐order logic for destroy" -InvocationName $MyInvocation.MyCommand.Name
+            _LogMessage -Level 'DEBUG' -Message "Original stackFolders: $($stackFolders -join ', ')" -InvocationName $MyInvocation.MyCommand.Name
 
-            # 1. sort numerically by the leading digits in the folder name
-            $stackFolders = $stackFolders |
-                    Sort-Object {
-                        # “C:\...\1_network”  →  1
-                        [int](
-                        (($_ -split '[\\/]')[-1]) -replace '^(\d+)_.*', '$1'
-                        )
-                    }
+            # Pick out those folders whose name starts with digits_, sort them descending by that leading number
+            $numericFolders = $stackFolders |
+                    Where-Object { ($_ -split '[\\/]+')[-1] -match '^\d+_' } |
+                    Sort-Object { [int](($_ -split '[\\/]+')[-1] -replace '^(\d+)_.*','$1') } -Descending
 
-            # 2. reverse   (static .NET call – do **not** pipe this!)
-            [array]::Reverse($stackFolders)
+            # Everything else stays in original order
+            $otherFolders = $stackFolders | Where-Object { $_ -notin $numericFolders }
+
+            # Recombine
+            $stackFolders = $numericFolders + $otherFolders
+
+            _LogMessage -Level 'DEBUG' -Message "Reordered stackFolders: $($stackFolders -join ', ')" -InvocationName $MyInvocation.MyCommand.Name
         }
+
 
         foreach ($folder in $stackFolders)
         {
             $processedStacks += $folder
-            _LogMessage -Level 'INFO' -Message "Resolved stack folders: $($stackFolders -join ', ')" -InvocationName $MyInvocation.MyCommand.Name
+            _LogMessage -Level 'INFO' -Message "Resolved stack folders: $( $stackFolders -join ', ' )" -InvocationName $MyInvocation.MyCommand.Name
 
             # terraform fmt – always safe
             Invoke-TerraformFmtCheck  -CodePath $folder
@@ -334,10 +337,10 @@ try
                     $TfPlanFileName = $TerraformDestroyPlanFileName
                 }
 
-                Convert-TerraformPlanToJson -CodePath $folder -PlanFile $TfPlanFileName
-
                 if ($convertedRunCheckov -and $convertedRunTerraformPlan)
                 {
+                    Convert-TerraformPlanToJson -CodePath $folder -PlanFile $TfPlanFileName
+
                     Invoke-Checkov `
                         -CodePath           $folder `
                         -CheckovSkipChecks  $CheckovSkipCheck `
