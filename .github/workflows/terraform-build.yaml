@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   terraform:
-    runs-on: ubuntu-latest
+    runs-on: ghcr.io/libre-devops/terraform-azure-composite-gh-action/runner:latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
