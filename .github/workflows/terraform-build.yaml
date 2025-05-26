@@ -3,10 +3,6 @@ name: Terraform Build
 on:
   workflow_dispatch:
     inputs:
-      terraform-code-location:
-        description: 'Terraform code location'
-        required: false
-        default: 'terraform'
       terraform-workspace:
         description: 'Terraform workspace'
         required: false
@@ -37,7 +33,6 @@ jobs:
       - name: Libre DevOps - Run Terraform for Azure
         uses: libre-devops/terraform-azure-composite-gh-action@v0.1
         with:
-          terraform-code-location: ${{ github.event.inputs.terraform-code-location }}
           terraform-stack-to-run-json: ${{ github.event.inputs.terraform-stack-to-run-json }}
           terraform-workspace: ${{ github.event.inputs.terraform-workspace }}
           debug-mode: ${{ github.event.inputs.debug-mode }}
