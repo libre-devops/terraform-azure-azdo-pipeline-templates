@@ -65,3 +65,4 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
           ARM_OIDC_TOKEN: ${{ env.OIDC_TOKEN }}
           TENV_AUTO_INSTALL: true
+          ARM_USE_AZUREAD: true
