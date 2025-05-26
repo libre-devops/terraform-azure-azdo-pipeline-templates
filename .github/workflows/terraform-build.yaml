@@ -20,7 +20,7 @@ on:
       debug-mode:
         description: 'Debug mode'
         required: false
-        default: 'true'
+        default: 'false'
 env:
   terraform-init-extra-args-json: '["-backend-config=subscription_id=${{ secrets.ARM_BACKEND_SUBSCRIPTION_ID }}", "-backend-config=resource_group_name=${{ secrets.ARM_BACKEND_STORAGE_RG_NAME }}", "-backend-config=storage_account_name=${{ secrets.ARM_BACKEND_STORAGE_ACCOUNT }}", "-backend-config=container_name=${{ secrets.ARM_BACKEND_CONTAINER_NAME }}"]'
 
