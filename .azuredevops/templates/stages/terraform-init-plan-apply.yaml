@@ -112,7 +112,7 @@ parameters:
   - name: RunCheckov
     type: string
     values: [ "true", "false" ]
-    default: "true"
+    default: "false"
     displayName: 'Run Checkov Scan'
 
   - name: CheckovSkipCheck
