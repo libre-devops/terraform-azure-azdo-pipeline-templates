@@ -269,7 +269,7 @@ stages:
         ${{ each stageVar in parameters.additionalStageVars }}:
           ${{ stageVar.Key }}: ${{ stageVar.Value }}
     jobs:
-      - template: ../jobs/terraform-init-plan-destroy.yaml
+      - template: ../jobs/terraform-init-plan-destroy-apply.yaml
         parameters:
           TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
           TerraformStackToRunJson: ${{ parameters.TerraformStackToRunJson }}
