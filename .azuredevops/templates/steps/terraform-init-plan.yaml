@@ -246,9 +246,15 @@ steps:
       
         Write-Host "Org name is: $org"
       
+      if ($Env:SYSTEM_ACCESSTOKEN) {
+      Write-Host "Token length: $($Env:SYSTEM_ACCESSTOKEN.Length)"
+        } else {
+          Write-Host "SYSTEM_ACCESSTOKEN is EMPTY"
+        }
+      
         git config --global url."https://$Env:SYSTEM_ACCESSTOKEN@dev.azure.com/".insteadOf "https://$org@dev.azure.com/"
 
-    condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
+    condition: eq(${{ parameters.ConfigureAzureDevOpsGitUrl }}, 'true')
     displayName: 'Configure Azure DevOps Git URL with System.AccessToken injection'
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -365,7 +371,7 @@ steps:
 
   - pwsh: |
       git config --global --unset url."https://$Env:SYSTEM_ACCESSTOKEN@dev.azure.com/".insteadOf
-    condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
+    condition: eq(${{ parameters.ConfigureAzureDevOpsGitUrl }}, 'true')
     displayName: 'Unset Git long paths'
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
