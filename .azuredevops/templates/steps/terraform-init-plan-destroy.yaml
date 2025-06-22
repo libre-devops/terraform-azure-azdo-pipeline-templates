@@ -233,7 +233,7 @@ parameters:
 steps:
 
   - pwsh: |
-      git config --system core.longpaths true
+      git config --global core.longpaths true
     condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
     displayName: 'Configure Git long paths'
 
@@ -351,6 +351,11 @@ steps:
       # Additional custom env vars
       ${{ each envVar in parameters.additionalEnvVars }}:
         ${{ envVar.Key }}: ${{ envVar.Value }}
+
+  - pwsh: |
+      git config --global --unset url."https://$(System.AccessToken)@dev.azure.com/".insteadOf
+    condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
+    displayName: 'Unset Git long paths'
 
 
   - pwsh: |
