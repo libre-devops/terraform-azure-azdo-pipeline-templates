@@ -288,6 +288,8 @@ steps:
 
 
   - pwsh: |
+      
+      Write-Host "test system_access_token"
       git config --global url."https://$(System.AccessToken)@dev.azure.com/".insteadOf "https://dev.azure.com/"
 
       pwsh -File "$(Build.SourcesDirectory)\Run-AzTerraform.ps1" `
