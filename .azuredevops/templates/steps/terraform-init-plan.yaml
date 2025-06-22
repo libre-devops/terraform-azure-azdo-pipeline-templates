@@ -240,9 +240,15 @@ steps:
   - checkout: self
 
   - pwsh: |
-      git config --global url."https://$(System.AccessToken)@dev.azure.com/".insteadOf "https://dev.azure.com/"
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $org = ($collectionUri.Split('/')[-1])
+      
+        git config --global url."https://$Emv:SYSTEM_ACCESSTOKEN@dev.azure.com/".insteadOf "https://$org@dev.azure.com/"
+
     condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
     displayName: 'Configure Azure DevOps Git URL with System.AccessToken injection'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
   - task: AzureCLI@2
     displayName: 'Authenticate to Azure & set terraform environment variables'
@@ -288,9 +294,6 @@ steps:
 
 
   - pwsh: |
-      
-      Write-Host "test system_access_token"
-      git config --global url."https://$(System.AccessToken)@dev.azure.com/".insteadOf "https://dev.azure.com/"
 
       pwsh -File "$(Build.SourcesDirectory)\Run-AzTerraform.ps1" `
           -TerraformCodeLocation                      '${{ parameters.TerraformCodeLocation }}' `
