@@ -240,10 +240,13 @@ steps:
   - checkout: self
 
   - pwsh: |
+        Write-Host "Attempting to fetch org name..."
         $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
         $org = ($collectionUri.Split('/')[-1])
       
-        git config --global url."https://$Emv:SYSTEM_ACCESSTOKEN@dev.azure.com/".insteadOf "https://$org@dev.azure.com/"
+        Write-Host "Org name is: $org"
+      
+        git config --global url."https://$Env:SYSTEM_ACCESSTOKEN@dev.azure.com/".insteadOf "https://$org@dev.azure.com/"
 
     condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
     displayName: 'Configure Azure DevOps Git URL with System.AccessToken injection'
