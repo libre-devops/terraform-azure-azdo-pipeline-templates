@@ -220,8 +220,29 @@ parameters:
     default: ''
     displayName: 'Target Azure Subscription ID (Overrides Default)'
 
+  - name: EnableGitLongPaths
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Run Git Long paths enablement'
+
+  - name: ConfigureAzureDevOpsGitUrl
+    values: [ "true", "false" ]
+    default: "false"
+    displayName: 'Configure the Git Azure DevOps URL with insteadof for System.AccessToken injection'
+
 steps:
+
+  - pwsh: |
+      git config --system core.longpaths true
+    condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
+    displayName: 'Configure Git long paths'
+
   - checkout: self
+
+  - pwsh: |
+      git config --global url."https://$(System.AccessToken)@dev.azure.com/".insteadOf "https://dev.azure.com/"
+    condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
+    displayName: 'Configure Azure DevOps Git URL with System.AccessToken injection'
 
   - task: AzureCLI@2
     displayName: 'Authenticate to Azure & set terraform environment variables'
@@ -331,6 +352,10 @@ steps:
       ${{ each envVar in parameters.additionalEnvVars }}:
         ${{ envVar.Key }}: ${{ envVar.Value }}
 
+  - pwsh: |
+      git config --global --unset url."https://$(System.AccessToken)@dev.azure.com/".insteadOf
+    condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
+    displayName: 'Unset Azure DevOps Git URL with System.AccessToken injection'
 
   - pwsh: |
       Remove-Item -Path "$(Agent.BuildDirectory)\*" -Recurse -Force -ErrorAction SilentlyContinue

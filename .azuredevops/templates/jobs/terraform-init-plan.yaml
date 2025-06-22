@@ -1,4 +1,14 @@
 parameters:
+  - name: JobName
+    type: string
+    default: TerraformInitPlanJob
+    displayName: 'Custom Job Name'
+
+  - name: JobDisplayName
+    type: string
+    default: "Terraform Init & Terraform Plan"
+    displayName: 'Custom Job Display Name'
+
   - name: TerraformCodeLocation
     type: string
     default: 'terraform'
@@ -249,9 +259,19 @@ parameters:
       - "outputs"
       - "resources"
 
+  - name: EnableGitLongPaths
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Run Git Long paths enablement'
+
+  - name: ConfigureAzureDevOpsGitUrl
+    values: [ "true", "false" ]
+    default: "false"
+    displayName: 'Configure the Git Azure DevOps URL with insteadof for System.AccessToken injection'
+
 jobs:
-  - job: TerraformInitPlanJob
-    displayName: "Terraform Init & Terraform Plan"
+  - job: ${{ parameters.JobName }}
+    displayName: ${{ parameters.JobDisplayName }}
     pool:
       name: ${{ parameters.AzureDevOpsPoolName }}
       ${{ if eq(parameters.AzureDevOpsPoolName, 'Azure Pipelines') }}:
@@ -308,3 +328,5 @@ jobs:
           additionalEnvVars: ${{ parameters.additionalEnvVars }}
           BackendUseAzureADAuth: ${{ parameters.BackendUseAzureADAuth }}
           TargetSubscriptionId: ${{ parameters.TargetSubscriptionId }}
+          EnableGitLongPaths: ${{ parameters.EnableGitLongPaths }}
+          ConfigureAzureDevOpsGitUrl: ${{ parameters.ConfigureAzureDevOpsGitUrl }}

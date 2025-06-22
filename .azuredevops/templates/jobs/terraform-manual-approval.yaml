@@ -1,4 +1,14 @@
 parameters:
+  - name: JobName
+    type: string
+    default: ManualApprovalJob
+    displayName: 'Custom Job Name'
+
+  - name: JobDisplayName
+    type: string
+    default: "Manual Approval for Terraform"
+    displayName: 'Custom Job Display Name'
+
   - name: NotifyUsers
     type: string
     displayName: 'Notify Users'
@@ -25,8 +35,8 @@ parameters:
     displayName: 'Depends On'
 
 jobs:
-  - job: ManualApprovalJob
-    displayName: "Manual Approval"
+  - job: ${{ parameters.JobName }}
+    displayName: ${{ parameters.JobDisplayName }}
     dependsOn: ${{ parameters.dependsOnJobs }}
     pool: server  # This runs on the server, not on an agent
     steps:

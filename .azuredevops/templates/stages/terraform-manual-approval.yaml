@@ -1,4 +1,24 @@
 parameters:
+  - name: StageName
+    type: string
+    default: ManualApprovalStage
+    displayName: 'Custom Stage Name'
+
+  - name: StageDisplayName
+    type: string
+    default: "Manual Approval for Terraform"
+    displayName: 'Custom Stage Display Name'
+
+  - name: JobName
+    type: string
+    default: ManualApprovalJob
+    displayName: 'Custom Job Name'
+
+  - name: JobDisplayName
+    type: string
+    default: "Manual Approval for Terraform"
+    displayName: 'Custom Job Display Name'
+
   - name: NotifyUsers
     type: string
     displayName: 'Notify Users'
@@ -30,13 +50,15 @@ parameters:
     displayName: 'Depends On'
 
 stages:
-  - stage: ManualApprovalStage
-    displayName: "Manual Approval"
+  - stage: ${{ parameters.StageName }}
+    displayName: ${{ parameters.StageDisplayName }}
     dependsOn: ${{ parameters.dependsOnStages }}
     pool: server
     jobs:
       - template: ../jobs/terraform-manual-approval.yaml  # Adjust path as needed
         parameters:
+          JobName: ${{ parameters.JobName }}
+          JobDisplayName: ${{ parameters.JobDisplayName }}
           NotifyUsers: ${{ parameters.NotifyUsers }}
           Instructions: ${{ parameters.Instructions }}
           TimeoutInMinutes: ${{ parameters.TimeoutInMinutes }}

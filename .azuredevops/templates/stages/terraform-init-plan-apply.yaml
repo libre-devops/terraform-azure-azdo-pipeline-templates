@@ -1,5 +1,25 @@
 parameters:
 
+  - name: StageName
+    type: string
+    default: TerraformInitPlanApplyStage
+    displayName: 'Custom Stage Name'
+
+  - name: StageDisplayName
+    type: string
+    default: "Terraform Init, Terraform Plan & Terraform Apply"
+    displayName: 'Custom Stage Display Name'
+
+  - name: JobName
+    type: string
+    default: TerraformInitPlanApplyJob
+    displayName: 'Custom Job Name'
+
+  - name: JobDisplayName
+    type: string
+    default: "Terraform Init, Terraform Plan & Terraform Apply"
+    displayName: 'Custom Job Display Name'
+
   - name: TerraformCodeLocation
     type: string
     default: 'terraform'
@@ -260,9 +280,19 @@ parameters:
       - "outputs"
       - "resources"
 
+  - name: EnableGitLongPaths
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Run Git Long paths enablement'
+
+  - name: ConfigureAzureDevOpsGitUrl
+    values: [ "true", "false" ]
+    default: "false"
+    displayName: 'Configure the Git Azure DevOps URL with insteadof for System.AccessToken injection'
+
 stages:
-  - stage: TerraformInitPlanApplyStage
-    displayName: "Terraform Init, Terraform Plan & Terraform Apply"
+  - stage: ${{ parameters.StageName }}
+    displayName: ${{ parameters.StageDisplayName }}
     dependsOn: ${{ parameters.dependsOnStages }}
     ${{ if ne(length(parameters.additionalStageVars), 0) }}:
       variables:
@@ -271,6 +301,8 @@ stages:
     jobs:
       - template: ../jobs/terraform-init-plan-apply.yaml
         parameters:
+          JobName: ${{ parameters.JobName }}
+          JobDisplayName: ${{ parameters.JobDisplayName }}
           TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
           TerraformStackToRunJson: ${{ parameters.TerraformStackToRunJson }}
           TerraformWorkspace: ${{ parameters.TerraformWorkspace }}
@@ -316,3 +348,5 @@ stages:
           AzurePipelinesVmImage: ${{ parameters.AzurePipelinesVmImage }}
           dependsOnJobs: ${{ parameters.dependsOnJobs }}
           WorkspaceClean: ${{ parameters.WorkspaceClean }}
+          EnableGitLongPaths: ${{ parameters.EnableGitLongPaths }}
+          ConfigureAzureDevOpsGitUrl: ${{ parameters.ConfigureAzureDevOpsGitUrl }}
