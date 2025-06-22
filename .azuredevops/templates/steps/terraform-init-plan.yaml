@@ -364,9 +364,11 @@ steps:
 
 
   - pwsh: |
-      git config --global --unset url."https://$(System.AccessToken)@dev.azure.com/".insteadOf
+      git config --global --unset url."https://$Env:SYSTEM_ACCESSTOKEN@dev.azure.com/".insteadOf
     condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
     displayName: 'Unset Git long paths'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
   - pwsh: |
       git config --global --unset core.longpaths
