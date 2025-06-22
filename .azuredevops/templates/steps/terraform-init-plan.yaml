@@ -246,11 +246,11 @@ steps:
       
         Write-Host "Org name is: $org"
       
-      if ($Env:SYSTEM_ACCESSTOKEN) {
-      Write-Host "Token length: $($Env:SYSTEM_ACCESSTOKEN.Length)"
-        } else {
-          Write-Host "SYSTEM_ACCESSTOKEN is EMPTY"
-        }
+        if ($Env:SYSTEM_ACCESSTOKEN) {
+        Write-Host "Token length: $($Env:SYSTEM_ACCESSTOKEN.Length)"
+          } else {
+            Write-Host "SYSTEM_ACCESSTOKEN is EMPTY"
+          }
       
         git config --global url."https://$Env:SYSTEM_ACCESSTOKEN@dev.azure.com/".insteadOf "https://$org@dev.azure.com/"
 
