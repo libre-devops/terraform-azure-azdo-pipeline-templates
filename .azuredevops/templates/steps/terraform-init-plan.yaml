@@ -252,7 +252,7 @@ steps:
             Write-Host "SYSTEM_ACCESSTOKEN is EMPTY"
           }
       
-        git config --global url."https://$Env:SYSTEM_ACCESSTOKEN@dev.azure.com/".insteadOf "https://$org@dev.azure.com/"
+      git config --global url."https://$(System.AccessToken)@dev.azure.com/".insteadOf "https://dev.azure.com/"
 
     condition: eq(${{ parameters.ConfigureAzureDevOpsGitUrl }}, 'true')
     displayName: 'Configure Azure DevOps Git URL with System.AccessToken injection'
