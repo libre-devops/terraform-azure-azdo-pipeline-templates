@@ -1,0 +1,92 @@
+# .azuredevops/templates/terraform-check.yml
+# ─────────────────────────────────────────────────────────────────────────────
+parameters:
+  - name: StepsName
+    type: string
+    default: 'RunAzTerraformCheck'
+  - name: StepsDisplayName
+    type: string
+    default: 'Terraform format & validate'
+
+  - name: TerraformCodeLocation
+    type: string
+    default: 'terraform'
+
+  - name: TerraformFmtExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: TerraformValidateExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: DebugMode
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+
+steps:
+
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      try {
+        $codeDir = '${{ parameters.TerraformCodeLocation }}'
+
+        function Parse-JsonArgs([string]$json) {
+          $out = @()
+          if (-not [string]::IsNullOrWhiteSpace($json) -and $json.Trim() -notin @('[]','[ ]')) {
+            try     { $p = $json | ConvertFrom-Json }
+            catch   { throw "Invalid JSON: $($_.Exception.Message)" }
+            switch ($p.GetType().Name) {
+              'String'   { $out += $p }
+              'Object[]' { $out += $p }
+              default    { throw 'JSON must be string or array of strings.' }
+            }
+          }
+          return $out
+        }
+
+        # ───────── terraform fmt -------------------------------------------
+        $fmtArgs = @('fmt', '-recursive', '-check') + (Parse-JsonArgs '${{ parameters.TerraformFmtExtraArgsJson }}')
+
+        Push-Location $codeDir
+        try {
+          Write-Host "##[command]terraform $($fmtArgs -join ' ')"
+          & terraform @fmtArgs
+        }
+        finally { Pop-Location }
+
+        $valArgs = @('validate') + (Parse-JsonArgs '${{ parameters.TerraformValidateExtraArgsJson }}')
+
+        Push-Location $codeDir
+        try {
+          Write-Host "##[command]terraform $($valArgs -join ' ')"
+          & terraform @valArgs
+        }
+        finally { Pop-Location }
+
+        Write-Host '✅ Terraform fmt & validate completed successfully.'
+      }
+      catch {
+        Write-Error "❌ Terraform check failed: $($_.Exception.Message)"
+        exit 1
+      }
+    name: ${{ parameters.StepsName }}
+    displayName: ${{ parameters.StepsDisplayName }}
+    env:
+      ARM_CLIENT_ID:        $(ARM_CLIENT_ID)
+      ARM_TENANT_ID:        $(ARM_TENANT_ID)
+      ARM_SUBSCRIPTION_ID:  $(ARM_SUBSCRIPTION_ID)
+      ARM_USE_AZUREAD:      $(ARM_USE_AZUREAD)
+      SYSTEM_ACCESSTOKEN:   $(System.AccessToken)
+
+      ${{ if eq(parameters.DebugMode, 'true') }}:
+        TF_LOG: DEBUG
+
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}
+

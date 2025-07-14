@@ -1,0 +1,192 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: 'RunCheckov'
+
+  - name: StepsDisplayName
+    type: string
+    default: 'Run checkov'
+
+  - name: TerraformCodeLocation
+    type: string
+    default: 'terraform'
+
+  - name: CheckovScanType
+    type: string
+    values: [ 'plan', 'source', 'auto' ]
+    default: 'auto'
+
+  - name: CheckovPlanJsonFileName
+    type: string
+    default: 'tfplan.plan.json'
+
+  - name: CheckovExternalChecksDir
+    type: string
+    default: 'checkov'
+
+  - name: CheckovSkipChecks
+    type: string
+    default: ''          # comma-separated list
+
+  - name: CheckovSoftFail
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+  - name: CheckovExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: InstallCheckov
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+  - name: DebugMode
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+
+  - name: CleanWorkspaceFiles
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Whether to clean workspace files at this step'
+
+steps:
+
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      $needInstall = '${{ parameters.InstallCheckov }}' -eq 'true'
+      if ($needInstall -and -not (Get-Command checkov -ErrorAction SilentlyContinue)) {
+
+        Write-Host 'Checkov not found – attempting installation …'
+        $isWin = $IsWindows
+
+        function Assert-HomebrewPath {
+          if ($isWin) { return }
+          if (Get-Command brew -ErrorAction SilentlyContinue) { return }
+          $brewExe = '/home/linuxbrew/.linuxbrew/bin/brew'
+          if (-not (Test-Path $brewExe)) { $brewExe = '/opt/homebrew/bin/brew' }
+          if (Test-Path $brewExe) {
+            Write-Host "Running $(Split-Path $brewExe -Leaf) shellenv"
+            & $brewExe shellenv | Invoke-Expression
+          }
+        }
+
+        if ($isWin) {
+          foreach ($cmd in 'pipx','pip3','pip') {
+            if (Get-Command $cmd -ErrorAction SilentlyContinue) {
+              & $cmd install --upgrade checkov
+              break
+            }
+          }
+        }
+        else {
+          Assert-HomebrewPath
+          if (Get-Command brew -ErrorAction SilentlyContinue) {
+            brew install checkov
+          }
+          else {
+            foreach ($cmd in 'pipx','pip3','pip') {
+              if (Get-Command $cmd -ErrorAction SilentlyContinue) {
+                sudo $cmd install --upgrade checkov
+                break
+              }
+            }
+          }
+        }
+
+        if (-not (Get-Command checkov -ErrorAction SilentlyContinue)) {
+          throw 'Failed to install Checkov.'
+        }
+        Write-Host "✅ Checkov installed: $(Get-Command checkov)."
+      }
+      else {
+        Write-Host 'Checkov already present, or installation disabled.'
+      }
+
+      function Parse-JsonArgs([string]$json) {
+        $out = @()
+        if (-not [string]::IsNullOrWhiteSpace($json) -and $json.Trim() -notin @('[]','[ ]')) {
+          try     { $p = $json | ConvertFrom-Json }
+          catch   { throw "Extra args JSON invalid: $($_.Exception.Message)" }
+          switch ($p.GetType().Name) {
+            'String'   { $out += $p }
+            'Object[]' { $out += $p }
+            default    { throw 'Extra args JSON must be string or array of strings.' }
+          }
+        }
+        return $out
+      }
+
+      $codeDir   = '${{ parameters.TerraformCodeLocation }}'
+      $scanType  = '${{ parameters.CheckovScanType }}'
+      $planFile  = Join-Path $codeDir '${{ parameters.CheckovPlanJsonFileName }}'
+      $extDir    = '${{ parameters.CheckovExternalChecksDir }}'
+      $skipRaw   = '${{ parameters.CheckovSkipChecks }}'
+      $softFail  = '${{ parameters.CheckovSoftFail }}' -eq 'true'
+
+      # detect mode when auto
+      if ($scanType -eq 'auto') {
+        $scanType = (Test-Path $planFile) ? 'plan' : 'source'
+      }
+
+      if ($scanType -eq 'plan') {
+        if (-not (Test-Path $planFile)) {
+          throw "Plan JSON '$planFile' not found but CheckovScanType = plan."
+        }
+        $ckArgs = @(
+          '--framework','terraform_plan',
+          '-f', $planFile,
+          '--repo-root-for-plan-enrichment', $codeDir,
+          '--download-external-modules','false'
+        )
+      }
+      else {  # source
+        $ckArgs = @('-d', $codeDir)
+      }
+
+      if ($extDir -and (Test-Path $extDir)) {
+        $ckArgs += @('--external-checks-dir', $extDir)
+      }
+
+      if ($skipRaw.Trim()) {
+        $ids = ($skipRaw -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+        if ($ids) { $ckArgs += @('--skip-check', ($ids -join ',')) }
+      }
+
+      if ($softFail) { $ckArgs += '--soft-fail' }
+
+      $ckArgs += Parse-JsonArgs '${{ parameters.CheckovExtraArgsJson }}'
+
+      Write-Host "##[command]checkov $($ckArgs -join ' ')"
+      & checkov @ckArgs
+      $exit = $LASTEXITCODE
+
+      if ($exit -eq 0) {
+        Write-Host '✅ Checkov completed with no failed checks.'
+      }
+      elseif ($softFail) {
+        Write-Warning "Checkov reported issues (exit $exit) – continuing due to CheckovSoftFail."
+      }
+      else {
+        throw "Checkov failed (exit $exit)."
+      }
+    name: ${{ parameters.StepsName }}
+    displayName: ${{ parameters.StepsDisplayName }}
+    env:
+      ARM_CLIENT_ID:        $(ARM_CLIENT_ID)
+      ARM_TENANT_ID:        $(ARM_TENANT_ID)
+      ARM_SUBSCRIPTION_ID:  $(ARM_SUBSCRIPTION_ID)
+      ARM_USE_AZUREAD:      $(ARM_USE_AZUREAD)
+      SYSTEM_ACCESSTOKEN:   $(System.AccessToken)
+
+      ${{ if eq(parameters.DebugMode, 'true') }}:
+        TF_LOG: DEBUG
+
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}

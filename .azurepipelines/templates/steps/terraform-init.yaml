@@ -1,0 +1,278 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: "RunAzTerraformInit"
+    displayName: "Name of the terraform steps"
+
+  - name: StepsDisplayName
+    type: string
+    default: "Run terraform init"
+    displayName: "Display name for terraform step"
+
+  - name: TerraformCodeLocation
+    type: string
+    default: 'terraform'
+    displayName: 'Terraform Code Path'
+
+  - name: TerraformWorkspace
+    type: string
+    default: ''
+    displayName: 'Terraform Workspace'
+
+  - name: TerraformInitCreateBackendStateFilePrefix
+    type: string
+    default: ""
+    displayName: 'Backend prefix'
+
+  - name: TerraformInitCreateBackendStateFileSuffix
+    type: string
+    default: ""
+    displayName: 'Backend suffix'
+
+  - name: TerraformInitExtraArgsJson
+    type: string
+    default: '[ ]'
+    displayName: 'Extra Args for terraform init'
+
+  - name: DebugMode
+    type: string
+    values: [ "true", "false" ]
+    default: "false"
+    displayName: 'Enable Debug Logging'
+
+  - name: TerraformVersion
+    type: string
+    default: 'latest'
+    displayName: 'Terraform Version'
+
+  - name: CreateTerraformWorkspace
+    type: string
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Create or Select Terraform Workspace'
+
+  - name: UseAzureClientSecretLogin
+    type: string
+    values: [ "true", "false" ]
+    default: "false"
+    displayName: 'Use Azure Client Secret Login'
+
+  - name: UseAzureOidcLogin
+    type: string
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Use Azure OIDC Login'
+
+  - name: UseAzureUserLogin
+    type: string
+    values: [ "true", "false" ]
+    default: "false"
+    displayName: 'Use Azure User (Device Code) Login'
+
+  - name: UseAzureManagedIdentityLogin
+    type: string
+    values: [ "true", "false" ]
+    default: "false"
+    displayName: 'Use Azure Managed Identity Login'
+
+  - name: ServiceConnection
+    type: string
+    displayName: 'Azure DevOps Service Connection Name'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+    displayName: 'Additional Environment Variables to Export'
+
+  - name: BackendUseAzureADAuth
+    type: string
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Backend Authentication via Azure AD'
+
+  - name: TargetSubscriptionId
+    type: string
+    default: ''
+    displayName: 'Target Azure Subscription ID (Overrides Default)'
+
+  - name: EnableGitLongPaths
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Run Git Long paths enablement'
+
+  - name: ConfigureAzureDevOpsGitUrl
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Configure the Git Azure DevOps URL with header for System.AccessToken injection'
+
+steps:
+
+  - pwsh: |
+      git config --global core.longpaths true
+    condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
+    displayName: 'Configure Git long paths'
+
+  - checkout: self
+    persistCredentials: true
+    
+  - pwsh: |
+      Write-Host "Configuring Git for Azure DevOps…"
+
+      if (-not $Env:SYSTEM_ACCESSTOKEN) {
+        throw 'SYSTEM_ACCESSTOKEN is empty – enable "Allow scripts to access OAuth token".'
+      }
+
+      # username can be anything except empty; use 'ado'
+      $bytes      = [Text.Encoding]::ASCII.GetBytes("ado:$Env:SYSTEM_ACCESSTOKEN")
+      $basicValue = [Convert]::ToBase64String($bytes)
+      $header     = "AUTHORIZATION: Basic $basicValue"
+
+      git config --global http."https://dev.azure.com/".extraheader "$header"
+    condition: eq(${{ parameters.ConfigureAzureDevOpsGitUrl }}, 'true')
+    displayName: 'Configure Git auth for Azure DevOps'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+
+  - task: AzureCLI@2
+    displayName: 'Authenticate to Azure & set terraform environment variables'
+    name: 'AzureLoginTerraformInitPlan'
+    inputs:
+      azureSubscription: ${{ parameters.ServiceConnection }}
+      scriptType: 'pscore'
+      scriptLocation: inlineScript
+      inlineScript: |
+        Write-Host "##vso[task.setvariable variable=ARM_CLIENT_ID]$env:servicePrincipalId"
+        Write-Host "##vso[task.setvariable variable=ARM_TENANT_ID]$env:tenantId"
+
+        if ("${{ parameters.TargetSubscriptionId }}" -eq "") {
+          $subId = az account show --query id -o tsv
+          Write-Host "Using Azure CLI subscription: $subId"
+          Write-Host "##vso[task.setvariable variable=ARM_SUBSCRIPTION_ID]$subId"
+        } else {
+          Write-Host "Using explicitly provided subscription: ${{ parameters.TargetSubscriptionId }}"
+          Write-Host "##vso[task.setvariable variable=ARM_SUBSCRIPTION_ID]${{ parameters.TargetSubscriptionId }}"
+        }
+
+        if ("${{ parameters.UseAzureOidcLogin }}" -eq "true") {
+          Write-Host "##vso[task.setvariable variable=ARM_USE_OIDC]true"
+          Write-Host "##vso[task.setvariable variable=ARM_OIDC_TOKEN]$env:idToken"
+        }
+        
+        if ("${{ parameters.UseAzureManagedIdentityLogin }}" -eq "true") {
+          Write-Host "##vso[task.setvariable variable=ARM_USE_MSI]true"
+        }
+
+        if ("${{ parameters.UseAzureClientSecretLogin }}" -eq "true") {
+          Write-Host "##vso[task.setvariable variable=ARM_CLIENT_SECRET]$env:servicePrincipalKey"
+        }
+
+        if ("${{ parameters.BackendUseAzureADAuth }}" -eq "true") {
+          Write-Host "##vso[task.setvariable variable=ARM_USE_AZUREAD]true"
+        } else {
+          Write-Host "##vso[task.setvariable variable=ARM_USE_AZUREAD]false"
+        }
+      workingDirectory: ${{ parameters.TerraformCodeLocation }}
+      addSpnToEnvironment: true
+
+
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+
+      try {
+        $extra = @('-input=false')   # helper always adds this
+        $raw   = [string]'${{ parameters.TerraformInitExtraArgsJson }}'
+
+        if (-not [string]::IsNullOrWhiteSpace($raw) -and $raw.Trim() -notin @('[]','[ ]')) {
+          try     { $parsed = $raw | ConvertFrom-Json }
+          catch   { throw "TerraformInitExtraArgsJson invalid JSON: $($_.Exception.Message)" }
+
+          switch ($parsed.GetType().Name) {
+            'String'   { $extra += $parsed }
+            'Object[]' { $extra += $parsed }
+            default    { throw 'Init args JSON must be string or array of strings.' }
+          }
+        }
+
+        if (-not ($extra -match '^-backend-config=key=')) {
+          $repo = "$(Build.Repository.Name)"
+          $dir  = (Split-Path -Leaf '${{ parameters.TerraformCodeLocation }}') -replace '_','-'
+          $key  = "$repo-$dir"
+
+          if ('${{ parameters.TerraformInitCreateBackendStateFilePrefix }}') {
+            $key = "${{ parameters.TerraformInitCreateBackendStateFilePrefix }}-$key"
+          }
+          if ('${{ parameters.TerraformInitCreateBackendStateFileSuffix }}') {
+            $key += "-${{ parameters.TerraformInitCreateBackendStateFileSuffix }}"
+          }
+          $key += '.terraform.tfstate'
+
+          Write-Host "Auto backend key: $key"
+          $extra += "-backend-config=key=$key"
+        }
+
+        Push-Location '${{ parameters.TerraformCodeLocation }}'
+        try {
+          $tfArgs = @('init') + $extra
+          Write-Host "##[command]terraform $($tfArgs -join ' ')"
+          & terraform @tfArgs
+        }
+        finally { Pop-Location }
+
+        if ('${{ parameters.CreateTerraformWorkspace }}' -eq 'true' -and
+            -not [string]::IsNullOrWhiteSpace('${{ parameters.TerraformWorkspace }}')) {
+
+          Push-Location '${{ parameters.TerraformCodeLocation }}'
+          try {
+            $wsArgs = @(
+              'workspace', 'select', '-or-create=true',
+              '${{ parameters.TerraformWorkspace }}'
+            )
+            Write-Host "##[command]terraform $($wsArgs -join ' ')"
+            & terraform @wsArgs
+          }
+          finally { Pop-Location }
+        }
+
+        Write-Host '✅ Terraform init completed successfully.'
+      }
+      catch {
+        Write-Error "❌ Terraform init failed: $($_.Exception.Message)"
+        exit 1
+      }
+    name: ${{ parameters.StepsName }}
+    displayName: ${{ parameters.StepsDisplayName }}
+    env:
+      ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+      ARM_TENANT_ID: $(ARM_TENANT_ID)
+      ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+      ARM_USE_AZUREAD: $(ARM_USE_AZUREAD)
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+      ${{ if eq(parameters.UseAzureOidcLogin, 'true') }}:
+        ARM_USE_OIDC: true
+        ARM_OIDC_TOKEN: $(ARM_OIDC_TOKEN)
+
+      ${{ if eq(parameters.UseAzureManagedIdentityLogin, 'true') }}:
+        ARM_USE_MSI: true
+
+      ${{ if eq(parameters.UseAzureClientSecretLogin, 'true') }}:
+        ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}
+
+      ${{ if eq(parameters.DebugMode, 'true') }}:
+        TF_LOG: DEBUG
+
+
+  - pwsh: |
+      git config --global --unset-all http."https://dev.azure.com/".extraheader 2>$null
+      Write-Host "Unset Git extraheader for dev.azure.com"
+      
+      if ("${{ parameters.EnableGitLongPaths }}" -eq "true") {
+        git config --global --unset core.longpaths 2>$null
+        Write-Host "Unset Git core.longpaths"
+      }
+    condition: eq(${{ parameters.ConfigureAzureDevOpsGitUrl }}, 'true')
+    displayName: 'Cleanup Git config'

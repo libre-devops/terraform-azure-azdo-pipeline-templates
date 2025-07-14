@@ -1,0 +1,30 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: 'Clean Workspace Files'
+
+  - name: StepsDisplayName
+    type: string
+    default: 'Clean workspace files'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+
+  - name: CleanWorkspaceFiles
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Whether to clean workspace files at this step'
+
+steps:
+  - pwsh: |
+      Remove-Item -Path "$(Agent.BuildDirectory)\*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\.*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\s\**\*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\TestResults" -Recurse -Force -ErrorAction SilentlyContinue
+    condition: eq(${{ parameters.CleanWorkspaceFiles }}, 'true')
+    displayName: ${{ parameters.StepsDisplayName }}
+    name: ${{ parameters.StepsName }}
+    env:
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}

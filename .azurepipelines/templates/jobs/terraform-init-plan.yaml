@@ -1,0 +1,226 @@
+parameters:
+  - name: JobName
+    type: string
+    default: 'TerraformInitPlanJob'
+
+  - name: JobDisplayName
+    type: string
+    default: 'Terraform Init & Plan'
+
+  - name: dependsOnJobs
+    type: object
+    default: [ ]
+
+  - name: AzureDevOpsPoolName
+    type: string
+    default: 'Default'
+
+  - name: AzurePipelinesVmImage
+    type: string
+    default: 'ubuntu-latest'
+
+  - name: WorkspaceClean
+    type: string
+    default: 'all'
+    values: [ 'all','outputs','resources' ]
+
+  - name: additionalJobVars
+    type: object
+    default: { }
+
+  - name: TerraformCodeLocation
+    type: string
+    default: 'terraform'
+
+  - name: TerraformWorkspace
+    type: string
+    default: ''
+
+  - name: TerraformVersion
+    type: string
+    default: 'latest'
+
+  - name: TerraformInitExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: TerraformInitCreateBackendStateFilePrefix
+    type: string
+    default: ''
+
+  - name: TerraformInitCreateBackendStateFileSuffix
+    type: string
+    default: ''
+
+  - name: CreateTerraformWorkspace
+    type: string
+    values: [ 'true','false' ]
+    default: 'true'
+
+  - name: ServiceConnection
+    type: string
+    default: ''
+
+  - name: DebugMode
+    type: string
+    values: [ 'true','false' ]
+    default: 'false'
+
+  - name: UseAzureClientSecretLogin
+    type: string
+    values: [ 'true','false' ]
+    default: 'false'
+
+  - name: UseAzureOidcLogin
+    type: string
+    values: [ 'true','false' ]
+    default: 'true'
+
+  - name: UseAzureUserLogin
+    type: string
+    values: [ 'true','false' ]
+    default: 'false'
+
+  - name: UseAzureManagedIdentityLogin
+    type: string
+    values: [ 'true','false' ]
+    default: 'false'
+
+  - name: BackendUseAzureADAuth
+    type: string
+    values: [ 'true','false' ]
+    default: 'true'
+
+  - name: TargetSubscriptionId
+    type: string
+    default: ''
+
+  - name: EnableGitLongPaths
+    type: string
+    values: [ 'true','false' ]
+    default: 'true'
+
+  - name: ConfigureAzureDevOpsGitUrl
+    type: string
+    values: [ 'true','false' ]
+    default: 'false'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+
+  - name: TerraformPlanExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: TerraformPlanOutput
+    type: string
+    values: [ 'true','false' ]
+    default: 'true'
+
+  - name: TerraformPlanFileName
+    type: string
+    default: 'tfplan.plan'
+
+  - name: ConvertTerraformPlanToJson
+    type: string
+    values: [ 'true','false' ]
+    default: 'true'
+
+  - name: TerraformFmtExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: TerraformValidateExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: RunCheckov
+    type: string
+    values: [ 'true','false' ]
+    default: 'true'
+
+  - name: InstallCheckov
+    type: string
+    values: [ 'true','false' ]
+    default: 'false'
+
+  - name: CheckovSkipChecks
+    type: string
+    default: ''
+
+  - name: CheckovSoftfail
+    type: string
+    values: [ 'true','false' ]
+    default: 'false'
+
+  - name: CheckovExtraArgsJson
+    type: string
+    default: '[ ]'
+
+jobs:
+  - job: ${{ parameters.JobName }}
+    displayName: ${{ parameters.JobDisplayName }}
+    pool:
+      ${{ if ne(parameters.AzureDevOpsPoolName, '') }}:
+        name: ${{ parameters.AzureDevOpsPoolName }}
+      ${{ if eq(parameters.AzureDevOpsPoolName, 'Azure Pipelines') }}:
+        vmImage: ${{ parameters.AzurePipelinesVmImage }}
+    dependsOn: ${{ parameters.dependsOnJobs }}
+    workspace:
+      clean: ${{ parameters.WorkspaceClean }}
+    ${{ if ne(length(parameters.additionalJobVars), 0) }}:
+      variables:
+        ${{ each v in parameters.additionalJobVars }}:
+          ${{ v.Key }}: ${{ v.Value }}
+    steps:
+      - template: ../steps/terraform-install.yaml
+        parameters:
+          TerraformVersion: ${{ parameters.TerraformVersion }}
+
+      - template: ../steps/terraform-init.yaml
+        parameters:
+          TerraformCodeLocation:                     ${{ parameters.TerraformCodeLocation }}
+          TerraformWorkspace:                        ${{ parameters.TerraformWorkspace }}
+          TerraformInitExtraArgsJson:                ${{ parameters.TerraformInitExtraArgsJson }}
+          TerraformInitCreateBackendStateFilePrefix: ${{ parameters.TerraformInitCreateBackendStateFilePrefix }}
+          TerraformInitCreateBackendStateFileSuffix: ${{ parameters.TerraformInitCreateBackendStateFileSuffix }}
+          CreateTerraformWorkspace:                  ${{ parameters.CreateTerraformWorkspace }}
+          ServiceConnection:                         ${{ parameters.ServiceConnection }}
+          DebugMode:                                 ${{ parameters.DebugMode }}
+          UseAzureClientSecretLogin:                 ${{ parameters.UseAzureClientSecretLogin }}
+          UseAzureOidcLogin:                         ${{ parameters.UseAzureOidcLogin }}
+          UseAzureUserLogin:                         ${{ parameters.UseAzureUserLogin }}
+          UseAzureManagedIdentityLogin:              ${{ parameters.UseAzureManagedIdentityLogin }}
+          BackendUseAzureADAuth:                     ${{ parameters.BackendUseAzureADAuth }}
+          TargetSubscriptionId:                      ${{ parameters.TargetSubscriptionId }}
+          EnableGitLongPaths:                        ${{ parameters.EnableGitLongPaths }}
+          ConfigureAzureDevOpsGitUrl:                ${{ parameters.ConfigureAzureDevOpsGitUrl }}
+          additionalEnvVars:                         ${{ parameters.additionalEnvVars }}
+
+      - template: ../steps/terraform-check.yaml
+        parameters:
+          TerraformCodeLocation:          ${{ parameters.TerraformCodeLocation }}
+          TerraformFmtExtraArgsJson:      ${{ parameters.TerraformFmtExtraArgsJson }}
+          TerraformValidateExtraArgsJson: ${{ parameters.TerraformValidateExtraArgsJson }}
+          DebugMode:                      ${{ parameters.DebugMode }}
+          additionalEnvVars:              ${{ parameters.additionalEnvVars }}
+
+      - template: ../steps/terraform-plan.yaml
+        parameters:
+          TerraformCodeLocation:      ${{ parameters.TerraformCodeLocation }}
+          TerraformPlanExtraArgsJson: ${{ parameters.TerraformPlanExtraArgsJson }}
+          TerraformPlanOutput:        ${{ parameters.TerraformPlanOutput }}
+          TerraformPlanFileName:      ${{ parameters.TerraformPlanFileName }}
+          ConvertTerraformPlanToJson: ${{ parameters.ConvertTerraformPlanToJson }}
+          DebugMode:                  ${{ parameters.DebugMode }}
+          additionalEnvVars:          ${{ parameters.additionalEnvVars }}
+
+      - ${{ if eq(parameters.RunCheckov, 'true') }}:
+          - template: ../steps/terraform-checkov.yaml
+            parameters:
+              TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
+              InstallCheckov:        ${{ parameters.InstallCheckov }}
+              CheckovSkipChecks:      ${{ parameters.CheckovSkipChecks }}
+              CheckovSoftfail:       ${{ parameters.CheckovSoftfail }}
+              CheckovExtraArgsJson:  ${{ parameters.CheckovExtraArgsJson }}

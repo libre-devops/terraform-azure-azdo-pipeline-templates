@@ -1,0 +1,111 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: 'RunAzTerraformTest'
+
+  - name: StepsDisplayName
+    type: string
+    default: 'Run terraform test'
+
+  - name: TerraformCodeLocation
+    type: string
+    default: 'terraform'
+
+  - name: TerraformTestExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: PublishJUnitResults
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+  - name: DebugMode
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+
+  - name: CleanWorkspaceFiles
+    values: [ "true", "false" ]
+    default: "false"
+    displayName: 'Whether to clean workspace files at this step'
+
+steps:
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      try {
+        # helper to parse extra-args JSON safely
+        function Parse-JsonArgs([string]$json) {
+          $out = @()
+          if (-not [string]::IsNullOrWhiteSpace($json) -and $json.Trim() -notin @('[]','[ ]')) {
+            try     { $p = $json | ConvertFrom-Json }
+            catch   { throw "Invalid JSON: $($_.Exception.Message)" }
+            switch ($p.GetType().Name) {
+              'String'   { $out += $p }
+              'Object[]' { $out += $p }
+              default    { throw 'Extra args JSON must be string or array of strings.' }
+            }
+          }
+          return $out
+        }
+
+        $codeDir = '${{ parameters.TerraformCodeLocation }}'
+        $extra   = Parse-JsonArgs '${{ parameters.TerraformTestExtraArgsJson }}'
+
+        $publishJUnit = ('${{ parameters.PublishJUnitResults }}' -eq 'true')
+        $junitFile    = 'tf-test-results.xml'
+
+        if ($publishJUnit -and
+            -not ($extra -match '^-format(=|\s+junit)')) {
+          $extra += @('-format=junit', "-output=$junitFile")
+        }
+
+        $tfArgs = @('test') + $extra
+
+        Push-Location $codeDir
+        try {
+          Write-Host "##[command]terraform $($tfArgs -join ' ')"
+          & terraform @tfArgs
+        }
+        finally { Pop-Location }
+
+        Write-Host '✅ Terraform test completed successfully.'
+      }
+      catch {
+        Write-Error "❌ Terraform test failed: $($_.Exception.Message)"
+        exit 1
+      }
+    name: ${{ parameters.StepsName }}
+    displayName: ${{ parameters.StepsDisplayName }}
+    env:
+      ARM_CLIENT_ID:        $(ARM_CLIENT_ID)
+      ARM_TENANT_ID:        $(ARM_TENANT_ID)
+      ARM_SUBSCRIPTION_ID:  $(ARM_SUBSCRIPTION_ID)
+      ARM_USE_AZUREAD:      $(ARM_USE_AZUREAD)
+      SYSTEM_ACCESSTOKEN:   $(System.AccessToken)
+
+      ${{ if eq(parameters.DebugMode, 'true') }}:
+        TF_LOG: DEBUG
+
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Terraform test results'
+    condition: and(succeededOrFailed(), eq('${{ parameters.PublishJUnitResults }}','true'))
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '${{ parameters.TerraformCodeLocation }}/tf-test-results.xml'
+      failTaskOnFailedTests: true
+
+  - pwsh: |
+      Remove-Item -Path "$(Agent.BuildDirectory)\*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\.*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\s\**\*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\TestResults" -Recurse -Force -ErrorAction SilentlyContinue
+    condition: eq(${{ parameters.CleanWorkspaceFiles }}, 'true')
+    displayName: 'Clean workspace files'

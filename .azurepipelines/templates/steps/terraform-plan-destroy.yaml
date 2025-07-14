@@ -1,0 +1,109 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: 'RunAzTerraformPlanDestroy'
+
+  - name: StepsDisplayName
+    type: string
+    default: 'Run terraform plan -destroy'
+
+  - name: TerraformCodeLocation
+    type: string
+    default: 'terraform'
+
+  - name: TerraformPlanExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: TerraformPlanOutput
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'true'
+
+  - name: TerraformPlanFileName
+    type: string
+    default: 'tfplan-destroy.plan'
+
+  - name: ConvertTerraformPlanToJson
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'true'
+
+  - name: DebugMode
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+
+steps:
+
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      try {
+        $extra   = @()
+        $raw     = [string]'${{ parameters.TerraformPlanExtraArgsJson }}'
+        if (-not [string]::IsNullOrWhiteSpace($raw) -and $raw.Trim() -notin @('[]','[ ]')) {
+          try     { $parsed = $raw | ConvertFrom-Json }
+          catch   { throw "TerraformPlanExtraArgsJson invalid JSON: $($_.Exception.Message)" }
+
+          switch ($parsed.GetType().Name) {
+            'String'   { $extra += $parsed }
+            'Object[]' { $extra += $parsed }
+            default    { throw 'Extra args JSON must be string or array of strings.' }
+          }
+        }
+
+        $tfArgs = @('plan', '-destroy', '-input=false') + $extra
+
+        if ('${{ parameters.TerraformPlanOutput }}' -eq 'true' -and
+            -not ($tfArgs -contains '-out') -and
+            -not ($tfArgs -match '^-out=')) {
+          $tfArgs += ('-out', '${{ parameters.TerraformPlanFileName }}')
+        }
+
+        Push-Location '${{ parameters.TerraformCodeLocation }}'
+        try {
+          Write-Host "##[command]terraform $($tfArgs -join ' ')"
+          & terraform @tfArgs
+        }
+        finally { Pop-Location }
+
+        if ('${{ parameters.ConvertTerraformPlanToJson }}' -eq 'true' -and
+            '${{ parameters.TerraformPlanOutput }}' -eq 'true') {
+
+          $binary = Join-Path '${{ parameters.TerraformCodeLocation }}' '${{ parameters.TerraformPlanFileName }}'
+          if (Test-Path $binary) {
+            $json = "$binary.json"
+            Write-Host "##[command]terraform show -json $binary > $json"
+            Push-Location '${{ parameters.TerraformCodeLocation }}'
+            try   { terraform show -json $binary | Out-File -Encoding utf8 $json }
+            finally { Pop-Location }
+          }
+          else {
+            Write-Warning "Plan file '$binary' not found – skipping JSON export."
+          }
+        }
+
+        Write-Host '✅ Terraform plan -destroy completed successfully.'
+      }
+      catch {
+        Write-Error "❌ Terraform plan -destroy failed: $($_.Exception.Message)"
+        exit 1
+      }
+    name: ${{ parameters.StepsName }}
+    displayName: ${{ parameters.StepsDisplayName }}
+    env:
+      ARM_CLIENT_ID:        $(ARM_CLIENT_ID)
+      ARM_TENANT_ID:        $(ARM_TENANT_ID)
+      ARM_SUBSCRIPTION_ID:  $(ARM_SUBSCRIPTION_ID)
+      ARM_USE_AZUREAD:      $(ARM_USE_AZUREAD)
+      SYSTEM_ACCESSTOKEN:   $(System.AccessToken)
+
+      ${{ if eq(parameters.DebugMode, 'true') }}:
+        TF_LOG: DEBUG
+
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}

@@ -1,0 +1,114 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: 'RunAzTerraformDestroy'
+
+  - name: StepsDisplayName
+    type: string
+    default: 'Run terraform destroy'
+
+  - name: TerraformCodeLocation
+    type: string
+    default: 'terraform'
+
+  - name: TerraformPlanFileName
+    type: string
+    default: 'tfplan-destroy.plan'
+
+  - name: UsePlanFile
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'true'
+
+  - name: TerraformApplyExtraArgsJson
+    type: string
+    default: '[ ]'
+
+  - name: AutoApprove
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'true'
+
+  - name: DebugMode
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+
+  - name: CleanWorkspaceFiles
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Whether to clean workspace files at this step'
+
+steps:
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      try {
+        $extra = @()
+        $raw   = [string]'${{ parameters.TerraformApplyExtraArgsJson }}'
+        if (-not [string]::IsNullOrWhiteSpace($raw) -and $raw.Trim() -notin @('[]','[ ]')) {
+          try     { $parsed = $raw | ConvertFrom-Json }
+          catch   { throw "TerraformApplyExtraArgsJson invalid JSON: $($_.Exception.Message)" }
+
+          switch ($parsed.GetType().Name) {
+            'String'   { $extra += $parsed }
+            'Object[]' { $extra += $parsed }
+            default    { throw 'Apply args JSON must be string or array of strings.' }
+          }
+        }
+
+        $codeDir  = '${{ parameters.TerraformCodeLocation }}'
+        $planFile = Join-Path $codeDir '${{ parameters.TerraformPlanFileName }}'
+        $usePlan  = ('${{ parameters.UsePlanFile }}' -eq 'true') -and (Test-Path $planFile)
+
+        if ($usePlan) {
+          Write-Host "Using destroy plan file: $planFile"
+          $tfArgs = @('apply') + $extra + $planFile
+        }
+        else {
+          Write-Host 'No usable destroy plan – running terraform destroy.'
+          if ('${{ parameters.AutoApprove }}' -eq 'true' -and
+              -not ($extra -match '^-auto-approve$')) {
+            $extra += '-auto-approve'
+          }
+          $tfArgs = @('destroy') + $extra
+        }
+
+        Push-Location $codeDir
+        try {
+          Write-Host "##[command]terraform $($tfArgs -join ' ')"
+          & terraform @tfArgs
+        }
+        finally { Pop-Location }
+
+        Write-Host '✅ Terraform destroy completed successfully.'
+      }
+      catch {
+        Write-Error "❌ Terraform destroy failed: $($_.Exception.Message)"
+        exit 1
+      }
+    name: ${{ parameters.StepsName }}
+    displayName: ${{ parameters.StepsDisplayName }}
+    env:
+      ARM_CLIENT_ID:       $(ARM_CLIENT_ID)
+      ARM_TENANT_ID:       $(ARM_TENANT_ID)
+      ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+      ARM_USE_AZUREAD:     $(ARM_USE_AZUREAD)
+      SYSTEM_ACCESSTOKEN:  $(System.AccessToken)
+
+      ${{ if eq(parameters.DebugMode, 'true') }}:
+        TF_LOG: DEBUG
+
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}
+
+  - pwsh: |
+      Remove-Item -Path "$(Agent.BuildDirectory)\*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\.*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\s\**\*" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path "$(Agent.BuildDirectory)\TestResults" -Recurse -Force -ErrorAction SilentlyContinue
+    condition: eq(${{ parameters.CleanWorkspaceFiles }}, 'true')
+    displayName: 'Clean workspace files'

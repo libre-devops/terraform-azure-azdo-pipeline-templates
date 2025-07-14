@@ -1,0 +1,71 @@
+parameters:
+  - name: TerraformCodeLocation
+    type: string
+    default: 'terraform'
+
+  - name: InjectToken
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'true'
+
+  - name: RevertToken
+    type: string
+    values: [ 'true', 'false' ]
+    default: 'false'
+
+steps:
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      $dir = '${{ parameters.TerraformCodeLocation }}'
+      if (-not (Test-Path $dir)) { throw "TerraformCodeLocation not found: $dir" }
+
+      $tok = $Env:SYSTEM_ACCESSTOKEN
+      if (-not $tok) { $tok = $Env:SYSTEM_ACCESS_TOKEN }
+      if (-not $tok) { throw 'SYSTEM_ACCESSTOKEN is empty – enable OAuth token.' }
+
+      $search  = 'git::https://__SYSTEM_ACCESS_TOKEN__@'
+      $replace = "git::https://$tok@"
+
+      Write-Host "Injecting token into *.tf under '$dir' …"
+      Get-ChildItem -Recurse -Path $dir -Filter '*.tf' -File | ForEach-Object {
+        $c = Get-Content -LiteralPath $_.FullName -Raw
+        if ($c -match [regex]::Escape($search)) {
+          ($c -replace [regex]::Escape($search), $replace) |
+            Set-Content -LiteralPath $_.FullName -Encoding utf8
+          Write-Host "  ✓ Patched:  $($_.FullName)"
+        }
+      }
+      Write-Host '✅ Token injection complete.'
+    name: InjectAzDoToken
+    displayName: 'Inject Azure DevOps token into Terraform files'
+    condition: eq('${{ parameters.InjectToken }}','true')
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      $dir = '${{ parameters.TerraformCodeLocation }}'
+      if (-not (Test-Path $dir)) { throw "TerraformCodeLocation not found: $dir" }
+
+      $tok = $Env:SYSTEM_ACCESSTOKEN
+      if (-not $tok) { $tok = $Env:SYSTEM_ACCESS_TOKEN }
+      if (-not $tok) { throw 'SYSTEM_ACCESSTOKEN is empty – cannot revert.' }
+
+      $search  = [regex]::Escape("git::https://$tok@")
+      $replace = 'git::https://__SYSTEM_ACCESS_TOKEN__@'
+
+      Write-Host "Reverting token in *.tf under '$dir' …"
+      Get-ChildItem -Recurse -Path $dir -Filter '*.tf' -File | ForEach-Object {
+        $c = Get-Content -LiteralPath $_.FullName -Raw
+        if ($c -match $search) {
+          ($c -replace $search, $replace) |
+            Set-Content -LiteralPath $_.FullName -Encoding utf8
+          Write-Host "  ↺ Reverted: $($_.FullName)"
+        }
+      }
+      Write-Host '✅ Token reversion complete.'
+    name: RevertAzDoToken
+    displayName: 'Revert token placeholders in Terraform files'
+    condition: eq('${{ parameters.RevertToken }}','true')
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
