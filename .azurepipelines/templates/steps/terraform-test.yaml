@@ -29,11 +29,6 @@ parameters:
     type: object
     default: { }
 
-  - name: CleanWorkspaceFiles
-    values: [ "true", "false" ]
-    default: "false"
-    displayName: 'Whether to clean workspace files at this step'
-
 steps:
   - pwsh: |
       $ErrorActionPreference = 'Stop'
@@ -101,11 +96,3 @@ steps:
       testResultsFormat: 'JUnit'
       testResultsFiles: '${{ parameters.TerraformCodeLocation }}/tf-test-results.xml'
       failTaskOnFailedTests: true
-
-  - pwsh: |
-      Remove-Item -Path "$(Agent.BuildDirectory)\*" -Recurse -Force -ErrorAction SilentlyContinue
-      Remove-Item -Path "$(Agent.BuildDirectory)\.*" -Recurse -Force -ErrorAction SilentlyContinue
-      Remove-Item -Path "$(Agent.BuildDirectory)\s\**\*" -Recurse -Force -ErrorAction SilentlyContinue
-      Remove-Item -Path "$(Agent.BuildDirectory)\TestResults" -Recurse -Force -ErrorAction SilentlyContinue
-    condition: eq(${{ parameters.CleanWorkspaceFiles }}, 'true')
-    displayName: 'Clean workspace files'

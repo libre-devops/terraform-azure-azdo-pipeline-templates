@@ -5,22 +5,19 @@ trigger: none
 parameters:
   - name: ServiceConnection
     type: string
-    default: "spn-libd-uks-dev-mgmt-01"
-    displayName: 'Azure DevOps Service Connection'
+    default: spn-libd-uks-dev-mgmt-01
     values:
-      - "spn-libd-uks-dev-mgmt-01-client-secret-enabled"
-      - "spn-libd-uks-dev-mgmt-01"
-      - "uid-libd-uks-dev-mgmt-01"
+      - spn-libd-uks-dev-mgmt-01-client-secret-enabled
+      - spn-libd-uks-dev-mgmt-01
+      - uid-libd-uks-dev-mgmt-01
 
   - name: TerraformCodeLocation
     type: string
     default: '$(Build.SourcesDirectory)/terraform/0_rg'
-    displayName: 'Terraform Code Directory Path'
 
   - name: TerraformWorkspace
     type: string
-    default: 'dev'
-    displayName: 'Terraform Workspace Name'
+    default: dev
 
   - name: TerraformInitExtraArgsJson
     type: string
@@ -31,7 +28,6 @@ parameters:
         "-backend-config=storage_account_name=$(TF_VAR_ARM_BACKEND_STORAGE_ACCOUNT)",
         "-backend-config=container_name=$(TF_VAR_ARM_BACKEND_CONTAINER_NAME)"
       ]
-    displayName: 'Extra Args for terraform init'
 
 resources:
   repositories:
@@ -40,28 +36,25 @@ resources:
       name: libre-devops-terraform-modules/terraform-templates
       ref: main
 
-pool: 'Default'
-
 variables:
   - group: terraform-${{ parameters.TerraformWorkspace }}-vars
 
-steps:
-  - template: .azurepipelines/templates/steps/terraform-install.yaml@templates
-
-  - template: .azurepipelines/templates/steps/terraform-init.yaml@templates
+jobs:
+  - template: .azurepipelines/templates/jobs/terraform-init-plan-destroy.yaml@templates
     parameters:
       TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
-      TerraformInitExtraArgsJson: ${{ parameters.TerraformInitExtraArgsJson }}
-      ServiceConnection: ${{ parameters.ServiceConnection }}
       TerraformWorkspace: ${{ parameters.TerraformWorkspace }}
+      ServiceConnection: ${{ parameters.ServiceConnection }}
+      TerraformInitExtraArgsJson: ${{ parameters.TerraformInitExtraArgsJson }}
 
-  - template: .azurepipelines/templates/steps/terraform-plan-destroy.yaml@templates
+  - template: .azurepipelines/templates/jobs/terraform-manual-approval.yaml@templates
+    parameters:
+      DependsOnJobs: [TerraformInitPlanDestroyJob]
+
+  - template: .azurepipelines/templates/jobs/terraform-init-destroy.yaml@templates
     parameters:
       TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
-
-  - template: .azurepipelines/templates/steps/terraform-destroy.yaml@templates
-    parameters:
-      TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
-
-  - template: .azurepipelines/templates/steps/clean-workspace.yaml@templates
-
+      TerraformWorkspace: ${{ parameters.TerraformWorkspace }}
+      ServiceConnection: ${{ parameters.ServiceConnection }}
+      TerraformInitExtraArgsJson: ${{ parameters.TerraformInitExtraArgsJson }}
+      DependsOnJobs: [ManualApprovalJob]

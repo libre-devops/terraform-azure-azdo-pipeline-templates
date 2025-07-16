@@ -1,0 +1,80 @@
+parameters:
+  - name: StageName
+    type: string
+    default: ManualApprovalStage
+    displayName: 'Custom Stage Name'
+
+  - name: StageDisplayName
+    type: string
+    default: "Manual Approval for Terraform"
+    displayName: 'Custom Stage Display Name'
+
+  - name: JobName
+    type: string
+    default: ManualApprovalJob
+    displayName: 'Custom Job Name'
+
+  - name: JobDisplayName
+    type: string
+    default: "Manual Approval for Terraform"
+    displayName: 'Custom Job Display Name'
+
+  - name: AzureDevOpsPoolName
+    type: string
+    default: 'server'
+
+  - name: NotifyUsers
+    type: string
+    displayName: 'Notify Users'
+    default: ''
+
+  - name: StepsName
+    type: string
+    default: 'ManualApprovalSteps'
+
+  - name: StepsDisplayName
+    type: string
+    default: 'Manual Approval for Terraform'
+
+  - name: Instructions
+    type: string
+    default: 'Review the Terraform plan before applying.'
+    displayName: 'Instructions'
+
+  - name: TimeoutInMinutes
+    type: string
+    default: '60'
+    displayName: 'Timeout in Minutes'
+
+  - name: OnTimeout
+    type: string
+    default: 'reject'
+    displayName: 'On Timeout'
+
+  - name: dependsOnJobs
+    type: object
+    default: []
+    displayName: 'Depends On'
+
+  - name: dependsOnStages
+    type: object
+    default: [ ]
+    displayName: 'Depends On'
+
+stages:
+  - stage: ${{ parameters.StageName }}
+    displayName: ${{ parameters.StageDisplayName }}
+    dependsOn: ${{ parameters.dependsOnStages }}
+    pool: ${{ parameters.AzureDevOpsPoolName }}
+    jobs:
+      - template: ../jobs/terraform-manual-approval.yaml
+        parameters:
+          JobName: ${{ parameters.JobName }}
+          JobDisplayName: ${{ parameters.JobDisplayName }}
+          StepsName: ${{ parameters.JobName }}
+          StepsDisplayName: ${{ parameters.JobDisplayName }}
+          NotifyUsers: ${{ parameters.NotifyUsers }}
+          Instructions: ${{ parameters.Instructions }}
+          TimeoutInMinutes: ${{ parameters.TimeoutInMinutes }}
+          OnTimeout: ${{ parameters.OnTimeout }}
+          dependsOnJobs: ${{ parameters.dependsOnJobs }}

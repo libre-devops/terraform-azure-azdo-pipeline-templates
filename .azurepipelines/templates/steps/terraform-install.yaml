@@ -2,63 +2,53 @@ parameters:
   - name: StepsName
     type: string
     default: 'InstallTenvAndTerraform'
-
   - name: StepsDisplayName
     type: string
     default: 'Install tenv & desired Terraform version'
-
   - name: TerraformVersion
     type: string
     default: 'latest'
+  - name: additionalEnvVars
+    type: object
+    default: { }
 
 steps:
-
   - pwsh: |
       $ErrorActionPreference = 'Stop'
       $tfSpec = '${{ parameters.TerraformVersion }}'
       $isWin  = $IsWindows
-
+      
       function Assert-ChocoPath {
         if (-not $isWin) { return }
-
         $choco = Get-Command choco -ErrorAction SilentlyContinue
         if (-not $choco) {
           $default = 'C:\ProgramData\Chocolatey\bin\choco.exe'
           if (Test-Path $default) {
             $bin = Split-Path $default -Parent
             if ($env:PATH -notmatch [regex]::Escape($bin)) {
-              Write-Host "Adding '$bin' to PATH (process scope)."
               $env:PATH = "$env:PATH;$bin"
             }
           }
         }
       }
-
+      
       function Assert-HomebrewPath {
-        if ($isWin) { return }   # N/A on Windows
-
+        if ($isWin) { return }
         if (Get-Command brew -ErrorAction SilentlyContinue) { return }
-
-        # Homebrew installed but not in PATH?  try shellenv
         $brewExe = '/home/linuxbrew/.linuxbrew/bin/brew'
         if (-not (Test-Path $brewExe)) { $brewExe = '/opt/homebrew/bin/brew' }
-
         if (Test-Path $brewExe) {
-          Write-Host "Running $(Split-Path $brewExe -Leaf) shellenv ..."
           $shellEnv = & $brewExe shellenv
           Invoke-Expression ($shellEnv -join "`n")
         }
       }
-
+      
       function Download-File($url,$dst) {
-        Write-Host "Downloading $url ⇒ $dst"
         Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing
       }
-
+      
       $tenv = Get-Command tenv -ErrorAction SilentlyContinue
       if (-not $tenv) {
-        Write-Host 'tenv not found – attempting installation …'
-
         if ($isWin) {
           Assert-ChocoPath
           if (Get-Command choco -ErrorAction SilentlyContinue) {
@@ -96,54 +86,49 @@ steps:
             sudo chmod +x /usr/local/bin/tenv
           }
         }
-
         $tenv = Get-Command tenv -ErrorAction SilentlyContinue
         if (-not $tenv) { throw 'Failed to install tenv.' }
-        Write-Host "tenv installed at: $($tenv.Source)"
       }
-      else {
-        Write-Host "tenv already present: $($tenv.Source)"
-      }
-
-      if ($tfSpec -eq 'latest' -or $tfSpec -eq 'latest-1') {
-        Write-Host "Resolving '$tfSpec' to a specific version …"
-        $all = (& tenv tf list-remote) |
-                Select-String '^\d+\.\d+\.\d+$' |
-                ForEach-Object { $_.ToString().Trim() }
-
-        if (-not $all) { throw 'Unable to retrieve remote version list.' }
-        $all = $all | Sort-Object { [version]$_ }
-
-        if ($tfSpec -eq 'latest') {
-          $tfVer = $all[-1]
+      
+      switch ($tfSpec) {
+        'latest' {
+          & tenv tf install latest
+          & tenv tf use     latest
+          return
         }
-        else {
-          # latest-1 → previous minor
-          $latest = [version]$all[-1]
-          $targetMinor = $latest.Minor - 1
-          $tfVer = $all |
-                    Where-Object { $_ -match "^$($latest.Major)\.$targetMinor\.\d+$" } |
-                    Select-Object -Last 1
-          if (-not $tfVer) { throw 'No previous minor release found.' }
-        }
-      }
-      elseif ($tfSpec -match '^\d+(\.\d+){0,2}$') {
-        # constraint: "1.6" -> pick latest patch in that series
-        $prefix = [regex]::Escape($tfSpec)
-        $tfVer  = (& tenv tf list-remote) |
-                  Select-String "^$prefix\.\d+$" |
+        'latest-1' {
+          $all = (& tenv tf list-remote) |
+                  Select-String '^\d+\.\d+\.\d+$' |
                   ForEach-Object { $_.ToString().Trim() } |
-                  Sort-Object { [version]$_ } |
-                  Select-Object -Last 1
-        if (-not $tfVer) { throw "No version matches '$tfSpec'." }
+                  Sort-Object { [version]$_ }
+          if (-not $all) { throw 'Unable to retrieve remote version list.' }
+          $latest      = [version]$all[-1]
+          $targetMajor = $latest.Major - 1
+          $tfVer = $all |
+                    Where-Object { ([version]$_).Major -eq $targetMajor } |
+                    Select-Object -Last 1
+          if (-not $tfVer) { throw 'No previous major release found.' }
+        }
+        default {
+          if ($tfSpec -match '^\d+(\.\d+){0,2}$') {
+            $prefix = [regex]::Escape($tfSpec)
+            $tfVer  = (& tenv tf list-remote) |
+                      Select-String "^$prefix\.\d+$" |
+                      ForEach-Object { $_.ToString().Trim() } |
+                      Sort-Object { [version]$_ } |
+                      Select-Object -Last 1
+            if (-not $tfVer) { throw "No version matches '$tfSpec'." }
+          }
+          else {
+            $tfVer = $tfSpec
+          }
+        }
       }
-      else {
-        $tfVer = $tfSpec   # explicit full version
-      }
-
-      Write-Host "Installing / selecting Terraform $tfVer via tenv …"
+      
       & tenv tf install $tfVer
       & tenv tf use     $tfVer
-      Write-Host '✅ tenv / Terraform installation completed.'
     name: ${{ parameters.StepsName }}
     displayName: ${{ parameters.StepsDisplayName }}
+    env:
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}

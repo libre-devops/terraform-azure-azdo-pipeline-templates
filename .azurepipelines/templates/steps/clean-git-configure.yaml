@@ -1,0 +1,46 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: "CleanConfigureGit"
+    displayName: "Name of the steps"
+
+  - name: StepsDisplayName
+    type: string
+    default: "Clean Configure Git"
+    displayName: "Display name of the steps"
+
+  - name: CleanConfigureAzureDevOpsGitUrl
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Clean the the Git Azure DevOps URL with header for System.AccessToken injection'
+
+  - name: CleanEnableGitLongPaths
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Clean Git Long paths enablement'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+    displayName: 'Additional Environment Variables to Export'
+
+steps:
+  - pwsh: |
+      git config --global --unset-all http."https://dev.azure.com/".extraheader 2>$null
+      Write-Host "Unset Git extraheader for dev.azure.com"
+    condition: eq(${{ parameters.CleanConfigureAzureDevOpsGitUrl }}, 'true')
+    displayName: "${{ parameters.StepsDisplayName }} Extra Header"
+    name: "${{ parameters.StepsName }}ExtraHeader"
+    env:
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}
+
+  - pwsh: |
+      git config --global --unset core.longpaths 2>$null
+      Write-Host "Unset Git core.longpaths"
+    condition: eq(${{ parameters.CleanEnableGitLongPaths }}, 'true')
+    displayName: "${{ parameters.StepsDisplayName }} Long Paths"
+    name: "${{ parameters.StepsName }}LongPaths"
+    env:
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}

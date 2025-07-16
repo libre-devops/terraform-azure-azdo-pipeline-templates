@@ -9,6 +9,18 @@ parameters:
     default: "Manual Approval for Terraform"
     displayName: 'Custom Job Display Name'
 
+  - name: AzureDevOpsPoolName
+    type: string
+    default: 'server'
+
+  - name: StepsName
+    type: string
+    default: 'ManualApprovalSteps'
+
+  - name: StepsDisplayName
+    type: string
+    default: 'Manual Approval for Terraform'
+
   - name: NotifyUsers
     type: string
     displayName: 'Notify Users'
@@ -21,7 +33,7 @@ parameters:
 
   - name: TimeoutInMinutes
     type: string
-    default: '60'
+    default: '30'
     displayName: 'Timeout in Minutes'
 
   - name: OnTimeout
@@ -38,7 +50,7 @@ jobs:
   - job: ${{ parameters.JobName }}
     displayName: ${{ parameters.JobDisplayName }}
     dependsOn: ${{ parameters.dependsOnJobs }}
-    pool: server  # This runs on the server, not on an agent
+    pool: ${{ parameters.AzureDevOpsPoolName }}
     steps:
       - task: ManualValidation@0
         inputs:
@@ -46,4 +58,5 @@ jobs:
           instructions: ${{ parameters.Instructions }}
           timeoutInMinutes: ${{ parameters.TimeoutInMinutes }}
           onTimeout: ${{ parameters.OnTimeout }}
-        displayName: 'Manual Approval to Apply Terraform Changes'
+        name: ${{ parameters.StepsName }}
+        displayName: ${{ parameters.StepsDisplayName }}

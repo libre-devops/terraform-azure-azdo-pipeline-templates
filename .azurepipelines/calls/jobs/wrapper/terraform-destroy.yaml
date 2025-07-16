@@ -1,0 +1,48 @@
+name: terraform-init-plan.yaml-$(Build.DefinitionName)-$(date:yyyyMMdd)$(rev:.r)
+
+trigger: none
+
+parameters:
+  - name: ServiceConnection
+    type: string
+    default: spn-libd-uks-dev-mgmt-01
+    values:
+      - spn-libd-uks-dev-mgmt-01-client-secret-enabled
+      - spn-libd-uks-dev-mgmt-01
+      - uid-libd-uks-dev-mgmt-01
+
+  - name: TerraformCodeLocation
+    type: string
+    default: '$(Build.SourcesDirectory)/terraform/0_rg'
+
+  - name: TerraformWorkspace
+    type: string
+    default: dev
+
+  - name: TerraformInitExtraArgsJson
+    type: string
+    default: >
+      [
+        "-backend-config=subscription_id=$(TF_VAR_ARM_BACKEND_SUBSCRIPTION_ID)",
+        "-backend-config=resource_group_name=$(TF_VAR_ARM_BACKEND_STORAGE_RG_NAME)",
+        "-backend-config=storage_account_name=$(TF_VAR_ARM_BACKEND_STORAGE_ACCOUNT)",
+        "-backend-config=container_name=$(TF_VAR_ARM_BACKEND_CONTAINER_NAME)"
+      ]
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: libre-devops-terraform-modules/terraform-templates
+      ref: main
+
+variables:
+  - group: terraform-${{ parameters.TerraformWorkspace }}-vars
+
+jobs:
+  - template: .azurepipelines/templates/jobs/terraform-destroy.yaml@templates
+    parameters:
+      TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
+      TerraformWorkspace: ${{ parameters.TerraformWorkspace }}
+      ServiceConnection: ${{ parameters.ServiceConnection }}
+      TerraformInitExtraArgsJson: ${{ parameters.TerraformInitExtraArgsJson }}

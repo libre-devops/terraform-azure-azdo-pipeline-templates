@@ -67,3 +67,5 @@ steps:
     parameters:
       TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
 
+  - template: .azurepipelines/templates/steps/clean-workspace.yaml@templates
+

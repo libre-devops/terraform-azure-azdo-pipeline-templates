@@ -51,11 +51,6 @@ parameters:
     type: object
     default: { }
 
-  - name: CleanWorkspaceFiles
-    values: [ "true", "false" ]
-    default: "true"
-    displayName: 'Whether to clean workspace files at this step'
-
 steps:
 
   - pwsh: |
@@ -190,3 +185,4 @@ steps:
 
       ${{ each envVar in parameters.additionalEnvVars }}:
         ${{ envVar.Key }}: ${{ envVar.Value }}
+

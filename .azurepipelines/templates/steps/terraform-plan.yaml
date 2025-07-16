@@ -114,6 +114,3 @@ steps:
 
       ${{ each envVar in parameters.additionalEnvVars }}:
         ${{ envVar.Key }}: ${{ envVar.Value }}
-
-
-

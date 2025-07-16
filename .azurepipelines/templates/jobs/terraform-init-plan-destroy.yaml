@@ -1,11 +1,11 @@
 parameters:
   - name: JobName
     type: string
-    default: 'TerraformInitPlanJob'
+    default: 'TerraformInitPlanDestroyJob'
 
   - name: JobDisplayName
     type: string
-    default: 'Terraform Init & Plan'
+    default: 'Terraform Init & Plan -destroy'
 
   - name: JobWorkspaceClean
     type: string
@@ -241,7 +241,7 @@ jobs:
           DebugMode:                      ${{ parameters.DebugMode }}
           additionalEnvVars:              ${{ parameters.additionalEnvVars }}
 
-      - template: ../steps/terraform-plan.yaml
+      - template: ../steps/terraform-plan-destroy.yaml
         parameters:
           TerraformCodeLocation:      ${{ parameters.TerraformCodeLocation }}
           TerraformPlanExtraArgsJson: ${{ parameters.TerraformPlanExtraArgsJson }}
@@ -250,15 +250,6 @@ jobs:
           ConvertTerraformPlanToJson: ${{ parameters.ConvertTerraformPlanToJson }}
           DebugMode:                  ${{ parameters.DebugMode }}
           additionalEnvVars:          ${{ parameters.additionalEnvVars }}
-
-      - ${{ if eq(parameters.RunCheckov, 'true') }}:
-          - template: ../steps/terraform-checkov.yaml
-            parameters:
-              TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
-              InstallCheckov:        ${{ parameters.InstallCheckov }}
-              CheckovSkipChecks:     ${{ parameters.CheckovSkipChecks }}
-              CheckovSoftfail:       ${{ parameters.CheckovSoftfail }}
-              CheckovExtraArgsJson:  ${{ parameters.CheckovExtraArgsJson }}
 
       - ${{ if eq(parameters.CleanWorkspaceFiles, 'true') }}:
           - template: ../steps/clean-workspace.yaml

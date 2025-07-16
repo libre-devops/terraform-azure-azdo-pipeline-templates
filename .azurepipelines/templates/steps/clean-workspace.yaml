@@ -1,7 +1,7 @@
 parameters:
   - name: StepsName
     type: string
-    default: 'Clean Workspace Files'
+    default: 'CleanWorkspaceFiles'
 
   - name: StepsDisplayName
     type: string

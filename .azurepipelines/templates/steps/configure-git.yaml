@@ -1,0 +1,58 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: "ConfigureGit"
+    displayName: "Name of the steps"
+
+  - name: StepsDisplayName
+    type: string
+    default: "Configure Git"
+    displayName: "Display name of the steps"
+
+  - name: EnableGitLongPaths
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Run Git Long paths enablement'
+
+  - name: ConfigureAzureDevOpsGitUrl
+    values: [ "true", "false" ]
+    default: "true"
+    displayName: 'Configure the Git Azure DevOps URL with header for System.AccessToken injection'
+
+  - name: additionalEnvVars
+    type: object
+    default: { }
+    displayName: 'Additional Environment Variables to Export'
+
+steps:
+
+  - pwsh: |
+      git config --global core.longpaths true
+    condition: eq(${{ parameters.EnableGitLongPaths }}, 'true')
+    name: "${{ parameters.StepsName }}LongPaths"
+    displayName: "${{ parameters.StepsDisplayName }} Long Paths"
+    env:
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}
+
+  - pwsh: |
+      Write-Host "Configuring Git for Azure DevOps…"
+
+      if (-not $Env:SYSTEM_ACCESSTOKEN) {
+        throw 'SYSTEM_ACCESSTOKEN is empty – enable "Allow scripts to access OAuth token".'
+      }
+
+      # username can be anything except empty; use 'ado'
+      $bytes      = [Text.Encoding]::ASCII.GetBytes("ado:$Env:SYSTEM_ACCESSTOKEN")
+      $basicValue = [Convert]::ToBase64String($bytes)
+      $header     = "AUTHORIZATION: Basic $basicValue"
+
+      git config --global http."https://dev.azure.com/".extraheader "$header"
+    condition: eq(${{ parameters.ConfigureAzureDevOpsGitUrl }}, 'true')
+    name: "${{ parameters.StepsName }}ExtraHeader"
+    displayName: "${{ parameters.StepsDisplayName }} Extra Header"
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+      ${{ each envVar in parameters.additionalEnvVars }}:
+        ${{ envVar.Key }}: ${{ envVar.Value }}

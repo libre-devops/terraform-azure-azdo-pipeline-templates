@@ -1,11 +1,11 @@
 parameters:
   - name: JobName
     type: string
-    default: 'TerraformInitPlanJob'
+    default: 'TerraformInitApplyJob'
 
   - name: JobDisplayName
     type: string
-    default: 'Terraform Init & Plan'
+    default: 'Terraform Init, Plan & Apply'
 
   - name: JobWorkspaceClean
     type: string
@@ -131,6 +131,10 @@ parameters:
     type: string
     default: '[ ]'
 
+  - name: TerraformApplyExtraArgsJson
+    type: string
+    default: '[ ]'
+
   - name: RunCheckov
     type: string
     values: [ 'true','false' ]
@@ -241,7 +245,7 @@ jobs:
           DebugMode:                      ${{ parameters.DebugMode }}
           additionalEnvVars:              ${{ parameters.additionalEnvVars }}
 
-      - template: ../steps/terraform-plan.yaml
+      - template: ../steps/terraform-plan-destroy.yaml
         parameters:
           TerraformCodeLocation:      ${{ parameters.TerraformCodeLocation }}
           TerraformPlanExtraArgsJson: ${{ parameters.TerraformPlanExtraArgsJson }}
@@ -259,6 +263,13 @@ jobs:
               CheckovSkipChecks:     ${{ parameters.CheckovSkipChecks }}
               CheckovSoftfail:       ${{ parameters.CheckovSoftfail }}
               CheckovExtraArgsJson:  ${{ parameters.CheckovExtraArgsJson }}
+
+      - template: ../steps/terraform-apply.yaml
+        parameters:
+          TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
+          TerraformApplyExtraArgsJson: ${{ parameters.TerraformPlanExtraArgsJson }}
+          DebugMode: ${{ parameters.DebugMode }}
+          additionalEnvVars: ${{ parameters.additionalEnvVars }}
 
       - ${{ if eq(parameters.CleanWorkspaceFiles, 'true') }}:
           - template: ../steps/clean-workspace.yaml

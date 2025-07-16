@@ -1,0 +1,32 @@
+parameters:
+  - name: ServiceConnection
+    type: string
+
+  - name: TerraformCodeLocation
+    type: string
+
+  - name: TerraformWorkspace
+    type: string
+
+  - name: TerraformInitExtraArgsJson
+    type: string
+
+stages:
+  - template: ./terraform-init-plan.yaml
+    parameters:
+      TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
+      TerraformWorkspace: ${{ parameters.TerraformWorkspace }}
+      ServiceConnection: ${{ parameters.ServiceConnection }}
+      TerraformInitExtraArgsJson: ${{ parameters.TerraformInitExtraArgsJson }}
+
+  - template: ./terraform-manual-approval.yaml
+    parameters:
+      dependsOnStages: [TerraformInitPlanStage]
+
+  - template: ./terraform-init-apply.yaml
+    parameters:
+      TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
+      TerraformWorkspace: ${{ parameters.TerraformWorkspace }}
+      ServiceConnection: ${{ parameters.ServiceConnection }}
+      TerraformInitExtraArgsJson: ${{ parameters.TerraformInitExtraArgsJson }}
+      dependsOnStages: [ManualApprovalStage]

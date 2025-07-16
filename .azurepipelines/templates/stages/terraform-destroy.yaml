@@ -1,0 +1,33 @@
+parameters:
+  - name: ServiceConnection
+    type: string
+
+  - name: TerraformCodeLocation
+    type: string
+
+  - name: TerraformWorkspace
+    type: string
+
+  - name: TerraformInitExtraArgsJson
+    type: string
+
+
+stages:
+  - template: ./terraform-init-plan-destroy.yaml
+    parameters:
+      TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
+      TerraformWorkspace: ${{ parameters.TerraformWorkspace }}
+      ServiceConnection: ${{ parameters.ServiceConnection }}
+      TerraformInitExtraArgsJson: ${{ parameters.TerraformInitExtraArgsJson }}
+
+  - template: ./terraform-manual-approval.yaml
+    parameters:
+      DependsOnStages: [TerraformInitPlanDestroyStage]
+
+  - template: ./terraform-init-destroy.yaml
+    parameters:
+      TerraformCodeLocation: ${{ parameters.TerraformCodeLocation }}
+      TerraformWorkspace: ${{ parameters.TerraformWorkspace }}
+      ServiceConnection: ${{ parameters.ServiceConnection }}
+      TerraformInitExtraArgsJson: ${{ parameters.TerraformInitExtraArgsJson }}
+      dependsOnStages: [ManualApprovalStage]

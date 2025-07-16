@@ -1,0 +1,67 @@
+parameters:
+  - name: StepsName
+    type: string
+    default: AzureLogin
+  - name: StepsDisplayName
+    type: string
+    default: Authenticate to Azure & set terraform environment variables
+  - name: ServiceConnection
+    type: string
+  - name: TargetSubscriptionId
+    type: string
+    default: ''
+  - name: UseAzureOidcLogin
+    type: string
+    values: [ "true", "false" ]
+    default: "true"
+  - name: UseAzureManagedIdentityLogin
+    type: string
+    values: [ "true", "false" ]
+    default: "false"
+  - name: UseAzureClientSecretLogin
+    type: string
+    values: [ "true", "false" ]
+    default: "false"
+  - name: BackendUseAzureADAuth
+    type: string
+    values: [ "true", "false" ]
+    default: "true"
+
+steps:
+  - task: AzureCLI@2
+    name: ${{ parameters.StepsName }}
+    displayName: ${{ parameters.StepsDisplayName }}
+    inputs:
+      azureSubscription: ${{ parameters.ServiceConnection }}
+      scriptType: pscore
+      scriptLocation: inlineScript
+      inlineScript: |
+        Write-Host "##vso[task.setvariable variable=ARM_CLIENT_ID]$env:servicePrincipalId"
+        Write-Host "##vso[task.setvariable variable=ARM_TENANT_ID]$env:tenantId"
+        
+        if ("${{ parameters.TargetSubscriptionId }}" -eq "") {
+          $subId = az account show --query id -o tsv
+          Write-Host "##vso[task.setvariable variable=ARM_SUBSCRIPTION_ID]$subId"
+        } else {
+          Write-Host "##vso[task.setvariable variable=ARM_SUBSCRIPTION_ID]${{ parameters.TargetSubscriptionId }}"
+        }
+        
+        if ("${{ parameters.UseAzureOidcLogin }}" -eq "true") {
+          Write-Host "##vso[task.setvariable variable=ARM_USE_OIDC]true"
+          Write-Host "##vso[task.setvariable variable=ARM_OIDC_TOKEN]$env:idToken"
+        }
+        
+        if ("${{ parameters.UseAzureManagedIdentityLogin }}" -eq "true") {
+          Write-Host "##vso[task.setvariable variable=ARM_USE_MSI]true"
+        }
+        
+        if ("${{ parameters.UseAzureClientSecretLogin }}" -eq "true") {
+          Write-Host "##vso[task.setvariable variable=ARM_CLIENT_SECRET]$env:servicePrincipalKey"
+        }
+        
+        if ("${{ parameters.BackendUseAzureADAuth }}" -eq "true") {
+          Write-Host "##vso[task.setvariable variable=ARM_USE_AZUREAD]true"
+        } else {
+          Write-Host "##vso[task.setvariable variable=ARM_USE_AZUREAD]false"
+        }
+      addSpnToEnvironment: true
